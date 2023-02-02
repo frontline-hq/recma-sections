@@ -139,3 +139,7 @@ VFile {
   map: undefined
 }
 ```
+
+## Development
+
+Please note the [fronline-hq development guidelines](https://github.com/frontline-hq/developer-guidelines)
