@@ -21,4 +21,4 @@ function getComment (comment) {
     return comment ? comment.trim().startsWith('c:') ? comment.trim().slice(2) : undefined : undefined
 }
 
-compile(file, { recmaPlugins: [[recmaSection, { getComment: getComment }]] }).then(res => console.log(res))
+compile(file, { recmaPlugins: [[recmaSection, { getComment }]] }).then(res => console.log(res))
