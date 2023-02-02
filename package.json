@@ -1,6 +1,6 @@
 {
 	"name": "@frontline-hq/recma-sections",
-	"version": "1.0.1",
+	"version": "1.0.3",
 	"description": "A recma plugin to support markdown sections",
 	"repository": "git@github.com:frontline-hq/recma-sections.git",
 	"author": "Benjamin Preiss <benjaminpreiss@protonmail.com>",
