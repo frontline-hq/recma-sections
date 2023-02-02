@@ -18,7 +18,7 @@ Hello blue
 
 // return undefined for "illegal comments" or a string for the description to be used from the comment.
 function getComment (comment) {
-  return comment ? comment.trim().startsWith('c:') ? comment.trim().slice(2) : undefined : undefined
+    return comment ? comment.trim().startsWith('c:') ? comment.trim().slice(2) : undefined : undefined
 }
 
 compile(file, { recmaPlugins: [[recmaSection, { getComment: getComment }]] }).then(res => console.log(res))
