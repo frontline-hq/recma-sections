@@ -6,13 +6,13 @@ Utilize comments to split the exports from your .mdx files.
 ## Installation
 
 ```bash
-yarn add git+https://github.com/frontline-hq/recma-sections.git
+yarn add @frontline-hq/recma-sections
 ```
 
 or
 
 ```bash
-npm install git+https://github.com/frontline-hq/recma-sections.git
+npm install @frontline-hq/recma-sections
 ```
 
 ## Usage
