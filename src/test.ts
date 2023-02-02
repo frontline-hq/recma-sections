@@ -1,4 +1,4 @@
-import {compile} from '@mdx-js/mdx'
+import { compile } from '@mdx-js/mdx'
 import recmaSection from './index.js'
 
 const file = `
@@ -17,10 +17,8 @@ Hello blue
 `
 
 // return undefined for "illegal comments" or a string for the description to be used from the comment.
-function getComment(comment) {
+function getComment (comment: string) {
     return comment ? comment.trim().startsWith("c:") ? comment.trim().slice(2) : undefined : undefined
 }
 
-const result = await compile(file, {recmaPlugins: [[recmaSection, {getComment: getComment}]]})
-
-console.log(result)
+const result = compile(file, {recmaPlugins: [[recmaSection, {getComment: getComment}]]}).then(res => console.log(res))

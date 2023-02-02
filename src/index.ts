@@ -1,17 +1,18 @@
 import { traverse, replace } from 'estraverse'
+import { Declaration, ExportNamedDeclaration, Expression, Node, Program, Comment, ModuleDeclaration, Statement, Directive, Identifier, FunctionDeclaration, ClassDeclaration, ExpressionStatement, ClassExpression} from 'estree'
 
-function removeUnassociated(ast, start, end) {
+function removeUnassociated(ast: Node, start: number, end: number) {
     replace(ast, {
-        enter: function(node) {
+        enter: function(node: any) {
             if(Number.isInteger(node.end) && node.end < start || Number.isInteger(node.start) && node.start > end) {
                 // remove the rest of this path from ast.
-                return null
+                this.remove()
             }
         }
     })
 }
 
-function getMemberAssignment(sI, p, insertion) {
+function getMemberAssignment(sI: string, p: string, insertion: Expression | Identifier | Declaration): ExpressionStatement {
     // Can only be declaration or expression
     return {
         "type": "ExpressionStatement",
@@ -31,17 +32,17 @@ function getMemberAssignment(sI, p, insertion) {
                 "computed": false,
                 "optional": false
             },
-            "right": insertion
+            "right": insertion as Expression
         }
     }
 }
 
-function findKey(obj, value) {
+function findKey(obj: Node, value: Node) {
     return Object.keys(obj).find(k=>obj[k]===value)
 }
 
-function getNextIdentifier(ast, keyInParent, parent) {
-    let identifier
+function getNextIdentifier(ast: Node, keyInParent: string | undefined, parent: ExportNamedDeclaration): Identifier {
+    let identifier: Node | undefined = undefined
     traverse(ast, {
         enter: function (node, p) {
             const key = findKey(p ?? parent, node)
@@ -51,29 +52,34 @@ function getNextIdentifier(ast, keyInParent, parent) {
             }
         }
     })
+    if(identifier == null) throw new Error("Couldn't find identifier to name object property.");
     return identifier
 }
 
-export default function recmaSection ({getComment}) {
-    return function (ast) {
+type ExtendedComment = Comment & {start: number, end: number}
+
+export default function recmaSection ({getComment}: {getComment: (comment: string | undefined) => string | undefined}) {
+    return function (ast: Program & {start: number, end: number}) {
         const newAst = structuredClone(ast)
         newAst.body = []
+        const comments = ast.comments as Array<ExtendedComment> | undefined
         // Create sections, each with it's own ast copy.
-        const sections = [{
-            ast: structuredClone(ast),
-            comment: undefined,
-            start: 0,
-            end: undefined
-        }]
-            .concat(ast.comments.filter(v => getComment(v.value)))
+         
+        const sections = (comments?.filter(v => getComment(v.value)) ?? [])
             .map((c,i,array) => {
                 return {
                     ast: structuredClone(ast), 
-                    comment: getComment(c.value), 
+                    comment: getComment(c.value) as string, 
                     start: c.start, 
                     end: array.length > i+1 ? array[i+1].start : ast.end
                 }
             })
+        sections.splice(0,0,{
+            ast: structuredClone(ast),
+            comment: getComment(undefined) as string,
+            start: 0,
+            end: sections[0].start
+        })
         // Remove unassociated nodes from each sections ast copy
         sections.forEach(v => removeUnassociated(v.ast, v.start, v.end))
         // For all sections, except the 1st:
@@ -86,9 +92,9 @@ export default function recmaSection ({getComment}) {
 
         sections.filter(v=>v.comment).forEach((v, i) => {
             const sI = v.comment
-            const l1 = sI.length
+            const l1 = sI.length;
             //add to "end" if end >= at, add to "start" if start > at
-            newAst.body.splice(0,0,{
+            (newAst.body as Statement[]).splice(0,0,{
                     "type": "VariableDeclaration",
                     "declarations": [
                     {
@@ -107,8 +113,8 @@ export default function recmaSection ({getComment}) {
                 })
             // Go through all exports and transform them to object properties.
             replace(v.ast, {
-                enter: (node, parent) => {
-                    const bodyCursor = v.ast.body.indexOf(node)
+                enter: function (node, parent) {
+                    const bodyCursor = v.ast.body.indexOf(node as ModuleDeclaration | Statement | Directive)
                     switch (node.type) {
                         case "ExportDefaultDeclaration":
                             /*  this is a default export
@@ -141,7 +147,7 @@ export default function recmaSection ({getComment}) {
                                 const identifier = {
                                     "type": "Identifier",
                                     "name": p
-                                }
+                                } as Identifier
                                 const member = getMemberAssignment(sI, p, identifier)
                                 return {
                                     "type": "BlockStatement",
@@ -171,47 +177,41 @@ export default function recmaSection ({getComment}) {
                                 iterators.forEach((iterator) => {
                                     const insertion = structuredClone(iterator.localIdentifier)
                                     const p = iterator.exportedName
-                                    if(index = 0) {
-                                        const memberAssignment = getMemberAssignment(sI, p, insertion)
-                                        v.ast.body.splice(bodyCursor, 0, memberAssignment)
-                                    } else {
-                                        const memberAssignment = getMemberAssignment(sI, p, insertion)
-                                        v.ast.body.splice(bodyCursor, 0, memberAssignment)
-                                    }
+                                    const memberAssignment = getMemberAssignment(sI, p, insertion)
+                                    v.ast.body.splice(bodyCursor, 0, memberAssignment)
                                 })
                                 // completely remove node
-                                return null
+                                this.remove()
                             } else {
                                 // this would be an export with source
                                 // e.g. export export {foo} from "mod";
                                 // These are not section-specific and therefore can just stay exports.
-                                return undefined
+                                return
                             }
                         case "ExportAllDeclaration":
                             // this would be an export for all properties of source
                             // e.g. export * from "mod";
                             // These are not section-specific and therefore can just stay exports.
-                            return undefined
+                            return
                         default:
-                            return undefined
+                            return
                     }
                 }
             })
             // remove null references in body 
-            const iief = {
+            const iief: ExpressionStatement = {
                 "type": "ExpressionStatement",
                 "expression": {
                     "type": "CallExpression",
                     "callee": {
                         "type": "FunctionExpression",
                         "id": null,
-                        "expression": false,
                         "generator": false,
                         "async": false,
                         "params": [],
                         "body": {
                             "type": "BlockStatement",
-                            "body": v.ast.body.filter(v => v != null)
+                            "body": v.ast.body.filter(v => v != null) as Statement[]
                         }
                     },
                     "arguments": [],
