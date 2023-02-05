@@ -46,13 +46,13 @@
 	},
 	"scripts": {
 		"clean": "rm -rf ./lib",
-		"build": "npm run clean && npm run build:esm && npm run build:cjs",
+		"build": "yarn clean && yarn build:esm && yarn build:cjs",
 		"build:esm": "tsc -p ./tsconfig.esm.json && mv lib/esm/index.js lib/esm/index.mjs",
 		"build:cjs": "tsc -p ./tsconfig.cjs.json",
-		"prepack": "npm run build",
-		"test": "npm run test:esm",
+		"prepack": "yarn build",
+		"test": "yarn test:esm",
 		"test:esm": "env TS_NODE_PROJECT='./tsconfig.test.esm.json' mocha",
-		"ci": "npm install && npm run build"
+		"ci": "yarn install && yarn build"
 	},
 	"dependencies": {},
 	"publishConfig": {
