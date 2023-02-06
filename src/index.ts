@@ -1,5 +1,6 @@
-import { traverse, replace } from 'estraverse'
-import { Declaration, ExportNamedDeclaration, Expression, Node, Program, Comment, ModuleDeclaration, Statement, Directive, Identifier, FunctionDeclaration, ClassDeclaration, ExpressionStatement, ClassExpression} from 'estree'
+import { replace } from 'estraverse'
+import esquery from "esquery"
+import { Declaration, Expression, Node, Program, Comment, ModuleDeclaration, Statement, Directive, Identifier, ExpressionStatement} from 'estree'
 
 function removeUnassociated(ast: Node, start: number, end: number) {
     replace(ast, {
@@ -37,45 +38,26 @@ function getMemberAssignment(sI: string, p: string, insertion: Expression | Iden
     }
 }
 
-function findKey(obj: Node, value: Node) {
-    return Object.keys(obj).find(k=>obj[k]===value)
-}
-
-function getNextIdentifier(ast: Node, keyInParent: string | undefined, parent: ExportNamedDeclaration): Identifier {
-    let identifier: Node | undefined = undefined
-    traverse(ast, {
-        enter: function (node, p) {
-            const key = findKey(p ?? parent, node)
-            if (node.type === "Identifier" && node.name && keyInParent === key) {
-                identifier = node
-                this.break()
-            }
-        }
-    })
-    if(identifier == null) throw new Error("Couldn't find identifier to name object property.");
-    return identifier
-}
-
 type ExtendedComment = Comment & {start: number, end: number}
 
 export default function recmaSection ({getComment}: {getComment: (comment: string | undefined) => string | undefined}) {
     return function (ast: Program & {start: number, end: number}) {
-        const newAst = structuredClone(ast)
+        const newAst: Program = structuredClone(ast)
         newAst.body = []
-        const comments = ast.comments as Array<ExtendedComment> | undefined
+        const comments = ast.comments as Array<ExtendedComment>
         // Create sections, each with it's own ast copy.
          
         const sections = (comments?.filter(v => getComment(v.value)) ?? [])
             .map((c,i,array) => {
                 return {
-                    ast: structuredClone(ast), 
+                    ast: structuredClone(ast) as Program, 
                     comment: getComment(c.value) as string, 
                     start: c.start, 
                     end: array.length > i+1 ? array[i+1].start : ast.end
                 }
             })
         sections.splice(0,0,{
-            ast: structuredClone(ast),
+            ast: structuredClone(ast) as Program,
             comment: getComment(undefined) as string,
             start: 0,
             end: sections[0].start
@@ -90,9 +72,8 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
         // Add exports object to beginning of ast:
         // Added length: 11 + l -> ADD TO ALL NUMBERS higher than 11 + l
 
-        sections.filter(v=>v.comment).forEach((v, i) => {
-            const sI = v.comment
-            const l1 = sI.length;
+        sections.filter(v=>v.comment).forEach(v => {
+            const sI = v.comment;
             //add to "end" if end >= at, add to "start" if start > at
             (newAst.body as Statement[]).splice(0,0,{
                     "type": "VariableDeclaration",
@@ -112,8 +93,8 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
                     "kind": "const"
                 })
             // Go through all exports and transform them to object properties.
-            replace(v.ast, {
-                enter: function (node, parent) {
+            replace(v.ast as Program, {
+                enter: function (node) {
                     const bodyCursor = v.ast.body.indexOf(node as ModuleDeclaration | Statement | Directive)
                     switch (node.type) {
                         case "ExportDefaultDeclaration":
@@ -143,12 +124,12 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
                                     -> keep named declaration, Replace with object member assignment
                                 */
                                 const insertion = structuredClone(node.declaration)
-                                const p = getNextIdentifier(node.declaration, "id", node).name
+                                const pId = esquery(node.declaration, '*.id')[0] as Identifier
                                 const identifier = {
                                     "type": "Identifier",
-                                    "name": p
+                                    "name": pId.name
                                 } as Identifier
-                                const member = getMemberAssignment(sI, p, identifier)
+                                const member = getMemberAssignment(sI, pId.name, identifier)
                                 return {
                                     "type": "BlockStatement",
                                     "body": [
@@ -167,13 +148,12 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
                                 // Iterate through specifiers
                                 const iterators = node.specifiers.map(v => {
                                     return {
-                                        localIdentifier: getNextIdentifier(v, "local", node),
-                                        exportedName: getNextIdentifier(v, "exported", node).name,
+                                        localIdentifier: esquery(v, '*.local')[0] as Identifier,
+                                        exportedName: (esquery(v, '*.exported')[0] as Identifier).name,
                                         specifier: v
                                     }
                                 })
                                 // insert piece of code for all iterators
-                                const lastIterator = iterators.pop()
                                 iterators.forEach((iterator) => {
                                     const insertion = structuredClone(iterator.localIdentifier)
                                     const p = iterator.exportedName
