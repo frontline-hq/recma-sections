@@ -142,7 +142,23 @@ VFile {
 
 ## Shortcomings
 
-1. All imports have to be specified at the beginning of the document (not within sections). That is, because all imports within sections are purged.
+All imports have to be specified at the beginning of the document (not within sections). That is, because all imports within sections are purged. This code will not work:
+
+```mdx
+Some markdown
+
+{/*...some section*/}
+
+import * as ... from "..."
+```
+
+The resolved names for the sections cannot match the name of an export in the global scope. The following mdx will therefore throw an error
+
+```mdx
+export const blue = ""
+
+{/*...section name resolving to "blue"*/}
+```
 
 ## Development
 
