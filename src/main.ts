@@ -1,23 +1,44 @@
 import './style.css'
-import typescriptLogo from './typescript.svg'
-import { setupCounter } from './counter'
+import {compile as c} from "@mdx-js/mdx"
+import recmaSection from './index';
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div>
-    <a href="https://vitejs.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
+const input = document.querySelector<HTMLTextAreaElement>('#input')
+const output = document.querySelector<HTMLTextAreaElement>('#output')
+
+function getComment(comment:string) {
+  return comment ? comment.trim().startsWith("c:") ? comment.trim().slice(2) : undefined : undefined
+}
+
+function compile(input: string) {
+  return c(input, {
+    jsxImportSource: 'preact', 
+    recmaPlugins: [[recmaSection, {getComment: getComment}]]
+  })
+}
+
+function setOutput(input: HTMLTextAreaElement | null, output: HTMLTextAreaElement | null) {
+  compile(input!.value)
+    .then(o => output!.value = o.value)
+    .catch(e => console.log(e))
+}
+
+input!.value = `
+# blue
+
+{/*c:comment*/}
+
+export const c1 = ""
+
+{/*c:comment2*/}
+
+export const c2 = ""
 `
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+setOutput(input, output)
+
+function onInput(e:Event) {
+  const output = document.querySelector<HTMLTextAreaElement>('#output')
+  setOutput(e.target as HTMLTextAreaElement, output)
+}
+
+document.querySelector<HTMLTextAreaElement>('#input')!.oninput = onInput

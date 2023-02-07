@@ -44,10 +44,10 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
     return function (ast: Program & {start: number, end: number}) {
         const newAst: Program = structuredClone(ast)
         newAst.body = []
-        const comments = ast.comments as Array<ExtendedComment>
         // Create sections, each with it's own ast copy.
-         
-        const sections = (comments?.filter(v => getComment(v.value)) ?? [])
+        const sectionComments = (ast.comments as Array<ExtendedComment>)?.filter(v => getComment(v.value)) ?? []
+        if(sectionComments.length === 0) return ast
+        const sections = sectionComments
             .map((c,i,array) => {
                 return {
                     ast: structuredClone(ast) as Program, 
@@ -93,6 +93,7 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
                     "kind": "const"
                 })
             // Go through all exports and transform them to object properties.
+            const toAssign: ExpressionStatement[] = []
             replace(v.ast as Program, {
                 enter: function (node) {
                     const bodyCursor = v.ast.body.indexOf(node as ModuleDeclaration | Statement | Directive)
@@ -130,13 +131,8 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
                                     "name": pId.name
                                 } as Identifier
                                 const member = getMemberAssignment(sI, pId.name, identifier)
-                                return {
-                                    "type": "BlockStatement",
-                                    "body": [
-                                        insertion,
-                                        member
-                                    ]
-                                }
+                                toAssign.push(member)
+                                return insertion
                             } else if(node.specifiers) {
                                 /*  this is a specifier export
 
@@ -162,6 +158,7 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
                                 })
                                 // completely remove node
                                 this.remove()
+                                return
                             } else {
                                 // this would be an export with source
                                 // e.g. export export {foo} from "mod";
@@ -173,11 +170,15 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
                             // e.g. export * from "mod";
                             // These are not section-specific and therefore can just stay exports.
                             return
+                        case "ImportDeclaration":
+                            this.remove()
+                            return
                         default:
                             return
                     }
                 }
             })
+            v.ast.body.push(...toAssign)
             // remove null references in body 
             const iief: ExpressionStatement = {
                 "type": "ExpressionStatement",
@@ -191,7 +192,7 @@ export default function recmaSection ({getComment}: {getComment: (comment: strin
                         "params": [],
                         "body": {
                             "type": "BlockStatement",
-                            "body": v.ast.body.filter(v => v != null) as Statement[]
+                            "body": v.ast.body as Statement[]
                         }
                     },
                     "arguments": [],

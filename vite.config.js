@@ -2,6 +2,12 @@
 import { resolve } from 'path'
 import { defineConfig } from 'vite'
 import typescript from '@rollup/plugin-typescript';
+import recmaSection from './src/index';
+import mdx from '@mdx-js/rollup'
+
+function getComment(comment) {
+  return comment ? comment.trim().startsWith("c:") ? comment.trim().slice(2) : undefined : undefined
+}
 
 export default defineConfig({
   build: {
@@ -13,5 +19,8 @@ export default defineConfig({
       fileName: 'index',
     }
   },
-  plugins: [typescript()]
+  plugins: [typescript(), mdx({
+    jsxImportSource: 'preact', 
+    recmaPlugins: [[recmaSection, {getComment: getComment}]]
+})]
 })

@@ -140,6 +140,10 @@ VFile {
 }
 ```
 
+## Shortcomings
+
+1. All imports have to be specified at the beginning of the document (not within sections). That is, because all imports within sections are purged.
+
 ## Development
 
 Please note the [fronline-hq development guidelines](https://github.com/frontline-hq/developer-guidelines)
